@@ -1,0 +1,368 @@
+---
+title: "R_h1b_analysis_2023_2024"
+output: html_document
+date: "2024-11-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Name: Vaishnavi Meka, vameka@syr.edu
+### Throughout the analysis, I will attempt to answer the following questions:
+
+#* What are the top industries America needs the most? - To do 
+#* Who are the top employers that submit the most applications? - Done
+#* Which states and cities hire the most H-1B visa workers? - Partly Done
+#* 
+#* 
+# Data source:-  https://www.uscis.gov/tools/reports-and-studies/h-1b-employer-data-hub
+# Took 2023, 2024 data.
+
+## My Goal is, As a potential H1B Visa applicant, i want to be best prepared and have a strategic plan to apply my visa and benefit from it. In order to do that, I'm analyzing past 2 years (2023, 2024 data) and gathering insights for top employers, top locations, top industry I have to be in. Etc. 
+
+
+```
+
+
+```{r}
+# Reading data
+visa <- read.csv('employer_information.csv', stringsAsFactors = FALSE)
+visa
+```
+
+
+```{r}
+# structure of dataset
+str(visa)
+```
+
+
+```{r}
+# data processing
+## coverting these approval columns to numeric
+visa$Continuing.Approval <- as.numeric(visa$Continuing.Approval)
+visa$Initial.Approval <- as.numeric(visa$Initial.Approval)
+
+```
+
+```{r}
+visa
+```
+
+```{r}
+str(visa)
+```
+
+```{r}
+#removed first columne as it is not required, it is a index column
+visa <- visa[,-1]
+visa
+```
+
+```{r}
+# Removing Tax Id as it is not relevant to our analysis
+visa <- visa[,-3]
+visa
+```
+
+```{r}
+str(visa)
+```
+
+```{r}
+colSums(is.na(visa))  # Check how many NAs are in each column
+sum(complete.cases(visa))  # Count rows with no missing values
+```
+
+```{r}
+#removing nulls
+visa <- na.omit(visa)
+```
+
+```{r}
+#removing nulls
+visa <- visa[!apply(visa, 1, function(row) any(row == "")), ]
+
+```
+
+```{r}
+#removing nulls
+visa <- visa[!apply(visa, 1, function(row) any(row == " ")), ]
+
+
+```
+
+```{r}
+#removing nulls
+visa <- visa[!apply(visa, 1, function(row) any(row == "NULL")), ]
+
+```
+
+```{r}
+visa
+```
+
+```{r}
+# Removing duplicate rows
+visa <- visa[!duplicated(visa), ]
+visa
+```
+
+```{r}
+colnames(visa)
+```
+
+```{r}
+str(visa)
+```
+
+```{r}
+visa
+```
+
+```{r}
+# Converting Year to categorical
+visa$Fiscal.Year <- as.factor(visa$Fiscal.Year)
+visa$Industry..NAICS..Code <- as.factor(visa$Industry..NAICS..Code)
+visa$Petitioner.City <- as.factor(visa$Petitioner.City)
+visa$Petitioner.State <- as.factor(visa$Petitioner.State)
+```
+
+```{r}
+str(visa)
+```
+
+```{r}
+h1b_data <- visa
+```
+
+```{r}
+# Setting consistent color palette & Packages
+brwn1_color <- "#ece5de"
+brwn2_color <- "#967567"
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(wordcloud2)
+library(tidyr)
+library(usmap)
+```
+
+
+```{r}
+# Top 10 States Hiring the Most H1-B Workers
+
+
+options(repr.plot.width = 14, repr.plot.height = 8)  
+
+
+h1b_by_state <- visa %>%
+  group_by(Petitioner.State) %>%
+  summarise(Application.Count = n()) %>%
+  arrange(desc(Application.Count)) %>%
+  top_n(10, Application.Count)  
+
+# Visualize the top states
+ggplot(h1b_by_state, aes(x = reorder(Petitioner.State, -Application.Count), y = Application.Count, fill = Application.Count)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "#b3a197", high = "#6e493e") +
+  labs(title = "Top 10 States Hiring the Most H-1B Visa Workers",
+       x = "State",
+       y = "Number of Applications") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10),  
+    plot.title = element_text(face = "bold", size = 14, color = "#6e493e"),  
+    axis.title = element_text(color = "#6e493e"),  
+    legend.position = "right",
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "#ECE5DE", color = NA),  
+    plot.background = element_rect(fill = "#ECE5DE", color = NA)    
+  )
+
+```
+
+
+```{r}
+# Word cloud for top states by applications
+
+# Aggregate data for states
+top_states <- visa %>%
+  group_by(Petitioner.State) %>%
+  summarise(Application.Count = n()) %>%
+  arrange(desc(Application.Count))
+
+# Generate the word cloud
+wordcloud2(data = top_states, size = 0.8, color = "random-dark", backgroundColor = "#6E493E")
+```
+
+
+```{r}
+# Top 10 Industries hiring H1b Workers
+
+
+top_industries_combined <- visa %>%
+  filter(Fiscal.Year %in% c(2023, 2024)) %>%
+  group_by(Industry..NAICS..Code) %>%  
+  summarise(Application.Count = n()) %>%  
+  arrange(desc(Application.Count)) %>%  
+  slice_head(n = 10)  
+
+# Create a vertical bar plot
+ggplot(top_industries_combined, aes(x = reorder(Industry..NAICS..Code, Application.Count), y = Application.Count, fill = Application.Count)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  
+  scale_fill_gradient(low = brwn2_color, high = "#6e493e") +
+  labs(
+    title = "Top 10 Industries Hiring H-1B Workers (2023 & 2024 Combined)",
+    x = "Industry (NAICS Code)",
+    y = "Number of Applications"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 10, color = "#6e493e"),  
+    axis.text.y = element_text(size = 6, color = "#6e493e"),  
+    plot.title = element_text(face = "bold", size = 14, color = "#6e493e"), 
+    axis.title.x = element_text(color = "#6e493e"),  
+    axis.title.y = element_text(color = "#6e493e"),  
+    panel.background = element_rect(fill = "#ECE5DE", color = NA),
+    plot.background = element_rect(fill = "#ECE5DE", color = NA), 
+    panel.grid = element_blank()  
+  )
+
+```
+
+
+```{r}
+# Top 10 cities hiring H1b Workers
+
+
+top_cities_combined <- visa %>%
+  filter(Fiscal.Year %in% c(2023, 2024)) %>%
+  group_by(Petitioner.City) %>%
+  summarise(Application.Count = n()) %>%  
+  arrange(desc(Application.Count)) %>%
+  slice_head(n = 10)  
+
+# Create a vertical bar plot
+ggplot(top_cities_combined, aes(x = reorder(Petitioner.City, Application.Count), y = Application.Count, fill = Application.Count)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  
+  scale_fill_gradient(low = brwn2_color, high = "#6e493e") +  
+  labs(
+    title = "Top 10 Cities Hiring H-1B Workers (2023 & 2024 Combined)",
+    x = "City",
+    y = "Number of Applications"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 10, color = "#6e493e"),  
+    axis.text.y = element_text(size = 10, color = "#6e493e"),  
+    plot.title = element_text(face = "bold", size = 14, color = "#6e493e"),  
+    axis.title.x = element_text(color = "#6e493e"),  
+    axis.title.y = element_text(color = "#6e493e"),  
+    panel.background = element_rect(fill = "#ECE5DE", color = NA),  
+    plot.background = element_rect(fill = "#ECE5DE", color = NA),   
+    panel.grid = element_blank()
+  )
+```
+
+```{r}
+# States Hiring the Most H-1B Visa Workers (2023 & 2024 Combined)
+
+
+h1b_by_state <- visa %>%
+  group_by(Petitioner.State) %>%
+  summarise(Application.Count = n(), .groups = "drop") %>%
+  mutate(state = state.name[match(Petitioner.State, state.abb)]) %>%
+  filter(!is.na(state))
+
+# Plot the map
+plot_usmap(data = h1b_by_state, regions = "states", values = "Application.Count") +
+  scale_fill_continuous(low = "#ECE5DE", high = "#6e493e", name = "Applications") +  
+  labs(title = "States Hiring the Most H-1B Visa Workers (2023 & 2024 Combined)") +
+  theme_minimal() +
+  theme(
+    legend.title = element_text(size = 10, color = "#6e493e"),
+    plot.title = element_text(face = "bold", color = "#6e493e", size = 14),
+    panel.background = element_rect(fill = "#ECE5DE", color = NA),  
+    plot.background = element_rect(fill = "#ECE5DE", color = NA),   
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()   
+  )
+
+```
+
+
+
+
+```{r}
+
+# Analyzing industry preferences by state
+
+industry_state_correlation <- h1b_data %>%
+  group_by(Petitioner.State, `Industry..NAICS..Code`) %>%
+  summarise(
+    applications = n()
+  ) %>%
+  ungroup() %>%
+  group_by(Petitioner.State) %>%
+  mutate(
+    percentage = applications / sum(applications) * 100
+  ) %>%
+  filter(Petitioner.State %in% 
+           (group_by(., Petitioner.State) %>% 
+              summarise(total = sum(applications)) %>% 
+              top_n(10, total) %>% 
+              pull(Petitioner.State)))
+
+
+ggplot(industry_state_correlation, 
+       aes(x = Petitioner.State, 
+           y = `Industry..NAICS..Code`, 
+           fill = percentage)) +
+  geom_tile() +
+  scale_fill_gradient(low = brwn1_color	, high = "#6e493e") +
+  theme_minimal() +
+  labs(
+    title = "Industry Distribution Across Top 10 States",
+    subtitle = "Percentage of applications by industry in each state",
+    x = "State",
+    y = "Industry",
+    fill = "Percentage of Applications"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, color = "#6e493e"),  
+    axis.text.y = element_text(size = 8, color = "#6e493e"),               
+    plot.title = element_text(size = 14, face = "bold", color = "#6e493e"),
+    plot.subtitle = element_text(size = 10, color = "#6e493e"),            
+    axis.title.x = element_text(color = "#6e493e"),                        
+    axis.title.y = element_text(color = "#6e493e"),                        
+    panel.background = element_rect(fill = "#ECE5DE", color = NA),         
+    plot.background = element_rect(fill = "#ECE5DE", color = NA)           
+  )
+
+```
+
+
+```{r}
+# Generating word cloud for top hiring companies
+
+
+top_cities <- visa %>%
+  group_by(Employer..Petitioner..Name) %>%
+  summarise(Application.Count = n()) %>%
+  arrange(desc(Application.Count))
+
+
+wordcloud2(data = top_cities, size = 0.6, color = brwn2_color, backgroundColor = brwn1_color, fontFamily = "Impact")
+```
+
+
+
+
+
+
+
+
+
